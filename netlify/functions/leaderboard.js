@@ -1,4 +1,4 @@
-const { getStore } = require("@netlify/blobs");
+const { connectLambda, getStore } = require("@netlify/blobs");
 
 exports.handler = async function (event) {
   const headers = {
@@ -12,6 +12,8 @@ exports.handler = async function (event) {
     return { statusCode: 200, headers, body: "" };
   }
 
+  // Lambda-compatible functions must initialize the Blobs request context.
+  connectLambda(event);
   const store = getStore("leaderboard");
   const key = "top-scores";
 
