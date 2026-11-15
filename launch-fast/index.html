@@ -45,6 +45,17 @@ canvas{display:block;width:100vw;height:100dvh;touch-action:none;background:#111
 }
 
 </style>
+<style>
+.rankings-link{position:fixed;z-index:5;bottom:clamp(48px,9vh,82px);right:16px;padding:11px;color:#fff;background:#191536;border:2px solid #efa4eb;font:8px "Press Start 2P",monospace;text-decoration:none}
+#rankingsDialog{box-sizing:border-box;width:min(580px,calc(100% - 24px));max-height:90dvh;padding:clamp(16px,5vw,36px);color:#fff;background:#101125;border:3px solid #efa4eb;font:10px/1.8 "Press Start 2P",monospace}
+#rankingsDialog::backdrop{background:#080817d9}
+#rankingsDialog h1{font-size:clamp(14px,4vw,22px);color:#ffad67}
+#rankingsDialog table{width:100%;border-collapse:collapse;margin:20px 0}
+#rankingsDialog th,#rankingsDialog td{padding:9px 4px;border-bottom:1px solid #51436c;text-align:left;overflow-wrap:anywhere}
+#rankingsDialog :is(th,td):last-child{text-align:right}
+#rankingsDialog .rank-winner{background:#3e2d3c;color:#ffe184}
+#rankingsDialog button{font:inherit;background:#ff58cd;color:#160e26;border:0;padding:10px;cursor:pointer}
+</style>
 </head>
 <body>
 <canvas id="game" aria-label="Flying Chen Chen game" role="img" tabindex="0"></canvas>
@@ -71,6 +82,17 @@ canvas{display:block;width:100vw;height:100dvh;touch-action:none;background:#111
  <footer class="desktop-footer"><span id="desktopWorldName">01 / TOKYO</span><span id="desktopStatus" role="status" aria-live="polite">THE SKY IS YOURS</span><span>✦ ONE MORE FLIGHT</span></footer>
 </div>
 
+<a class="rankings-link" id="rankingsLink" href="#rankings">RANKINGS</a>
+<dialog id="rankingsDialog" aria-labelledby="rankingsTitle">
+ <h1 id="rankingsTitle">GLOBAL RANKINGS</h1>
+ <p>Top 5 players. Highest score last.</p>
+ <p id="rankingsStatus" role="status"></p>
+ <table id="rankingsTable" hidden>
+  <thead><tr><th scope="col">Rank</th><th scope="col">Player</th><th scope="col">Score</th></tr></thead>
+  <tbody></tbody>
+ </table>
+ <form method="dialog"><button autofocus>BACK TO GAME</button></form>
+</dialog>
 <script>
 "use strict";
 const BIRD_SRC="assets/chenchen.png";
@@ -145,7 +167,8 @@ function ensurePlayerName(){return saveName();}
 function storeLeaders(rows){leaders=rows.filter(r=>r&&r.name).map(r=>({name:cleanName(r.name),score:Number(r.score)||0})).sort((a,b)=>b.score-a.score).slice(0,5);localStorage.setItem("flyingChenChenLeaders",JSON.stringify(leaders));}
 async function fetchGlobalLeaders(){if(location.protocol==="file:")return;try{const res=await fetch(LEADERBOARD_API,{cache:"no-store"});if(!res.ok)return;const rows=await res.json();if(Array.isArray(rows))storeLeaders(rows);}catch(e){}}
 async function submitGlobalScore(){if(location.protocol==="file:"||!hasRealName())return;try{const res=await fetch(LEADERBOARD_API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:playerName,score})});if(!res.ok)return;const rows=await res.json();if(Array.isArray(rows))storeLeaders(rows);}catch(e){}}
-function saveLeader(){const name=cleanName(playerName);if(!name)return;const prev=leaders.find(r=>r.name===name);if(prev)prev.score=Math.max(prev.score,score);else leaders.push({name,score});leaders.sort((a,b)=>b.score-a.score);leaders=leaders.slice(0,5);localStorage.setItem("flyingChenChenLeaders",JSON.stringify(leaders));submitGlobalScore();}
+let pendingScore;
+function saveLeader(){const name=cleanName(playerName);if(!name)return;const prev=leaders.find(r=>r.name===name);if(prev)prev.score=Math.max(prev.score,score);else leaders.push({name,score});leaders.sort((a,b)=>b.score-a.score);leaders=leaders.slice(0,5);localStorage.setItem("flyingChenChenLeaders",JSON.stringify(leaders));pendingScore=submitGlobalScore();}
 function resetChen(){chen={x:W*(innerWidth<=768?.24:.28),y:H/2-56,vy:0,angle:0,flapAnim:0};}
 resetChen();resize();
 function beginTitle(newWorld=true){stopMusic();fetchGlobalLeaders();state="title";frame=0;deadFrame=0;score=0;clouds=[];drops=[];rainAnnounced=false;lastGapY=null;stormCount=0;shareOpen=false;resetChen();if(newWorld){nextWorld=selectedWorld==="random"?pickWorld(world):Number(selectedWorld);world=nextWorld;}}
@@ -191,7 +214,7 @@ worldSelect.style.left=(r.left+(uiX+40*uiScale)*scale)+"px";worldSelect.style.to
 function inputAt(p){if(state==="paused"){togglePause();return;}if(state==="title"){if(inRect(p,nameRect())){editPlayerName();return;}if(inRect(p,START)){beginReady();return;}return;} if(state==="ready"){beginPlay();return;} if(state==="play"){flap();return;} if(state==="dead"&&deadFrame>38){if(shareOpen){for(const r of shareRects()){if(inRect(p,r)){openShare(r.kind);return;}}}if(inRect(p,deadPlayRect())){beginTitle(true);return;}if(inRect(p,deadShareRect())){shareOpen=!shareOpen;return;}shareOpen=false;}}
 canvas.addEventListener("pointerdown",e=>{e.preventDefault();inputAt(pointerPos(e));});
 document.addEventListener("keydown",e=>{
- if(e.target===nameInput||e.target===worldSelect||e.target instanceof HTMLButtonElement||e.repeat)return;
+ if(rankingsDialog.open||e.target===nameInput||e.target===worldSelect||e.target instanceof HTMLButtonElement||e.repeat)return;
  if((e.code==="KeyP"||e.code==="Escape")&&isDesktop()){e.preventDefault();togglePause();return;}
  if(e.code!=="Space"&&e.code!=="ArrowUp")return;
  e.preventDefault();canvas.focus();
@@ -381,10 +404,52 @@ function drawDesktopResults(){
 }
 function drawDeadPanel(){if(isDesktop())drawDesktopResults();else withUI(drawDeadPanelUI);}
 function renderGame(){
+ rankingsLink.hidden=state!=="title"&&state!=="dead";
  updateNameInput();ctx.clearRect(0,0,W,H);
  const view=state==="paused"?pausedFrom:state;
  if(view==="title")drawTitle();else if(view==="ready")drawReady();else if(view==="play")drawPlay();else if(view==="dead"){drawBackground();drawClouds();for(const d of drops)drawDrop(d);drawGround();drawChen();drawScore();drawDeadPanel();}
 }
+const rankingsDialog=document.getElementById("rankingsDialog");
+const rankingsLink=document.getElementById("rankingsLink");
+const rankingsStatus=document.getElementById("rankingsStatus");
+const rankingsTable=document.getElementById("rankingsTable");
+let rankingsRequest=0;
+async function syncRankingsView(){
+ if(location.hash!=="#rankings"){
+  rankingsRequest++;
+  if(rankingsDialog.open)rankingsDialog.close();
+  return;
+ }
+ if(!rankingsDialog.open)rankingsDialog.showModal();
+ const request=++rankingsRequest;
+ rankingsStatus.textContent="Loading scores…";
+ rankingsTable.hidden=true;
+ try{
+  await pendingScore;
+  const response=await fetch(LEADERBOARD_API,{cache:"no-store"});
+  if(!response.ok)throw new Error("Leaderboard unavailable");
+  const rows=await response.json();
+  if(!Array.isArray(rows))throw new Error("Invalid leaderboard");
+  if(request!==rankingsRequest||!rankingsDialog.open)return;
+  const body=rankingsTable.tBodies[0];
+  body.replaceChildren();
+  rows.sort((a,b)=>b.score-a.score).slice(0,5)
+   .map((row,index)=>({...row,rank:index+1})).reverse().forEach(({rank,name,score})=>{
+    const tr=body.insertRow();
+    if(rank===1)tr.className="rank-winner";
+    for(const value of [rank,name,score])tr.insertCell().textContent=value;
+   });
+  rankingsTable.hidden=!body.rows.length;
+  rankingsStatus.textContent=body.rows.length?"":"No scores yet.";
+ }catch{
+  if(request===rankingsRequest&&rankingsDialog.open)rankingsStatus.textContent="Scores are unavailable. Reopen rankings to try again.";
+ }
+}
+addEventListener("hashchange",syncRankingsView);
+rankingsDialog.addEventListener("close",()=>{
+ if(location.hash==="#rankings")history.replaceState(null,"",location.pathname+location.search);
+});
+syncRankingsView();
 const STEP_MS=1000/120;let lastTick=0,tickCarry=0;
 function tick(now){if(!lastTick)lastTick=now;tickCarry+=Math.min(80,now-lastTick);lastTick=now;let steps=0;while(tickCarry>=STEP_MS&&steps<8){updateGame();tickCarry-=STEP_MS;steps++;}if(steps>0)renderGame();requestAnimationFrame(tick);}
 ctx.fillStyle="#080817";ctx.fillRect(0,0,W,H);ctx.textAlign="center";ctx.font="11px 'Press Start 2P', monospace";ctx.fillStyle="#ff88ff";ctx.fillText("Loading Chen Chen...",W/2,H/2-8);
