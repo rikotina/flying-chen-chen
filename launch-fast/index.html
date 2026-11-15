@@ -158,7 +158,7 @@ function playMusicStep(){if(!audioCtx||!musicPattern.length)return;const t=audio
 function startMusic(){if(!soundEnabled)return;const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;if(!audioCtx)audioCtx=new AC();audioCtx.resume&&audioCtx.resume();stopMusic();musicPattern=MUSIC_PATTERNS[Math.floor(Math.random()*MUSIC_PATTERNS.length)];musicStep=0;lastSparkleAt=0;playMusicStep();}
 function stopMusic(){if(musicTimer){clearTimeout(musicTimer);musicTimer=null;}}
 function sparkleSound(){if(!audioCtx)return;const t=audioCtx.currentTime;playTone(988,t,.08,.03,"triangle");playTone(1319,t+.08,.1,.026,"triangle");playTone(1760,t+.18,.14,.022,"sine");}
-function pointerPos(e){const r=canvas.getBoundingClientRect();const s=r.width/W;let x=(e.clientX-r.left)/s,y=(e.clientY-r.top)/s;if(state==="title"||state==="dead"){x=(x-uiX)/uiScale;y=(y-uiY)/uiScale;}return{x,y};}
+function pointerPos(e){const r=canvas.getBoundingClientRect();const s=r.width/W;let x=(e.clientX-r.left)/s,y=(e.clientY-r.top)/s;if(state==="dead"&&isDesktop()){const panel=desktopResultsLayout();x=(x-panel.x)/panel.scale;y=(y-panel.y)/panel.scale;}else if(state==="title"||state==="dead"){x=(x-uiX)/uiScale;y=(y-uiY)/uiScale;}return{x,y};}
 function inRect(p,r){return p.x>=r.x&&p.x<=r.x+r.w&&p.y>=r.y&&p.y<=r.y+r.h;}
 function nameRect(){return{x:70,y:306,w:180,h:34};}
 function updateNameInput(){
@@ -299,9 +299,10 @@ function makeTapCursor(){const oc=document.createElement("canvas"),ow=tapImg.nat
 function drawTapPrompt(){const bob=Math.sin(frame*.09)*8,hx=W/2,hy=H/2+50+bob;ctx.fillStyle="#d82414";rrect(hx+16,hy-54,68,26,6);ctx.beginPath();ctx.moveTo(hx+16,hy-49);ctx.lineTo(hx+2,hy-41);ctx.lineTo(hx+16,hy-33);ctx.fill();ctx.fillStyle="#fff";ctx.font="10px 'Press Start 2P', monospace";ctx.textAlign="center";ctx.fillText("TAP",hx+50,hy-36);if(frame%16<8){ctx.strokeStyle="rgba(0,0,0,.75)";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(hx-12,hy-22);ctx.lineTo(hx-20,hy-34);ctx.moveTo(hx+12,hy-22);ctx.lineTo(hx+20,hy-34);ctx.moveTo(hx,hy-25);ctx.lineTo(hx,hy-38);ctx.stroke();}if(tapCursorCanvas){ctx.save();ctx.imageSmoothingEnabled=false;ctx.drawImage(tapCursorCanvas,hx-28,hy-12,56,56);ctx.restore();}}
 function updateReady(){bgX-=.3;groundX-=.55;chen.y=H/2-70+Math.sin(frame*.07)*6;chen.angle=0;}
 function drawReadyUI(){ctx.textAlign="center";ctx.font="19px 'Press Start 2P', monospace";ctx.fillStyle="#ffff00";ctx.shadowColor="#ff8800";ctx.shadowBlur=12;ctx.fillText("GET READY!",W/2,H/2-112);ctx.shadowBlur=0;ctx.font="9px 'Press Start 2P', monospace";ctx.fillStyle="#fff";ctx.fillText(playerName,W/2,H/2-82);drawTapPrompt();}
-function deadPlayRect(){return{x:43,y:448,w:104,h:48};}
-function deadShareRect(){return{x:173,y:448,w:104,h:48};}
-function shareRects(){const y=415,w=62,h=28,g=8,x=21;return[{kind:"x",label:"X",x:x,y,w,h},{kind:"instagram",label:"STORY",x:x+(w+g),y,w,h},{kind:"snapchat",label:"SNAP",x:x+(w+g)*2,y,w,h},{kind:"imessage",label:"MSG",x:x+(w+g)*3,y,w,h}];}
+function desktopResultsLayout(){const scale=Math.min(1,W/650);return {scale,x:(W-600*scale)/2,y:(H-320*scale)/2};}
+function deadPlayRect(){if(isDesktop())return{x:28,y:246,w:138,h:48};return{x:43,y:448,w:104,h:48};}
+function deadShareRect(){if(isDesktop())return{x:182,y:246,w:138,h:48};return{x:173,y:448,w:104,h:48};}
+function shareRects(){const desktop=isDesktop(),y=desktop?207:415,w=62,h=28,g=8,x=desktop?34:21;return[{kind:"x",label:"X",x:x,y,w,h},{kind:"instagram",label:"STORY",x:x+(w+g),y,w,h},{kind:"snapchat",label:"SNAP",x:x+(w+g)*2,y,w,h},{kind:"imessage",label:"MSG",x:x+(w+g)*3,y,w,h}];}
 function shareMessage(){return "I scored "+score+" in Flying Chen Chen! Best: "+best;}
 function drawShareCard(){const c=document.createElement("canvas"),g=c.getContext("2d");c.width=1080;c.height=1920;const grad=g.createLinearGradient(0,0,0,c.height);grad.addColorStop(0,"#171236");grad.addColorStop(.48,"#7c3d9c");grad.addColorStop(1,"#ff82b7");g.fillStyle=grad;g.fillRect(0,0,c.width,c.height);g.fillStyle="rgba(255,255,255,.16)";for(let y=0;y<c.height;y+=60)for(let x=(y/60)%2?30:0;x<c.width;x+=60)g.fillRect(x,y,6,6);g.textAlign="center";g.shadowColor="#ff7add";g.shadowBlur=34;g.fillStyle="#fff";g.font="66px 'Press Start 2P', monospace";g.fillText("FLYING",420,282);g.font="62px 'Press Start 2P', monospace";g.fillText("CHEN CHEN",420,380);g.shadowBlur=0;g.save();g.translate(820,322);g.rotate(-.08);g.imageSmoothingEnabled=true;g.drawImage(birdImg,-150,-150,300,300);g.restore();g.fillStyle="rgba(8,10,28,.82)";rrectCard(g,140,560,800,690,34);g.strokeStyle="#ffffff";g.lineWidth=8;g.strokeRect(164,584,752,642);g.fillStyle="#ffdd59";g.font="46px 'Press Start 2P', monospace";g.fillText("SCORE",540,710);g.fillStyle="#fff";g.font="166px 'Press Start 2P', monospace";g.fillText(String(score),540,930);g.fillStyle="#c7f7ff";g.font="35px 'Press Start 2P', monospace";g.fillText("BEST "+best,540,1060);g.fillStyle="#fff";g.font="27px 'Press Start 2P', monospace";g.fillText("Can you beat Chen Chen?",540,1160);g.fillStyle="rgba(255,255,255,.86)";g.font="24px 'Press Start 2P', monospace";g.fillText("flying chen chen",540,1510);return c;}
 function rrectCard(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.lineTo(x+w-r,y);g.quadraticCurveTo(x+w,y,x+w,y+r);g.lineTo(x+w,y+h-r);g.quadraticCurveTo(x+w,y+h,x+w-r,y+h);g.lineTo(x+r,y+h);g.quadraticCurveTo(x,y+h,x,y+h-r);g.lineTo(x,y+r);g.quadraticCurveTo(x,y,x+r,y);g.fill();}
@@ -326,7 +327,59 @@ function updateDead(){deadFrame++;bgX-=.18;groundX-=.25;if(chen.y<GROUND_Y-CHEN_
 function updateGame(){if(state==="paused")return;frame++;if(state==="title")updateTitle();else if(state==="ready")updateReady();else if(state==="play")updatePlay();else if(state==="dead")updateDead();}
 function drawTitle(){drawBackground();drawGround();drawChen();if(!isDesktop())withUI(drawTitleUI);}
 function drawReady(){drawBackground();drawGround();drawChen();withUI(drawReadyUI);}
-function drawDeadPanel(){withUI(drawDeadPanelUI);}
+function drawDesktopResults(){
+ if(deadFrame<15)return;
+ const opacity=Math.min((deadFrame-15)/20,1);
+ ctx.fillStyle="rgba(0,0,0,"+(.52*opacity)+")";
+ ctx.fillRect(0,0,W,H);
+ if(opacity<.7)return;
+ const panel=desktopResultsLayout();
+ ctx.save();
+ ctx.translate(panel.x,panel.y);
+ ctx.scale(panel.scale,panel.scale);
+ ctx.fillStyle="#101125f5";
+ ctx.fillRect(0,0,600,320);
+ ctx.strokeStyle="#efa4eb";
+ ctx.lineWidth=3;
+ ctx.strokeRect(0,0,600,320);
+ ctx.fillStyle="#ffad67";
+ ctx.font="23px 'Press Start 2P', monospace";
+ ctx.textAlign="left";
+ ctx.fillText("GAME OVER",28,47);
+ ctx.fillStyle="#d3a9e9";
+ ctx.fillRect(344,72,2,220);
+ ctx.font="10px 'Press Start 2P', monospace";
+ ctx.fillText("SCORE",28,99);
+ ctx.fillText("BEST",171,99);
+ ctx.fillText("TOP 5",371,99);
+ ctx.fillStyle="#fff";
+ ctx.font="24px 'Press Start 2P', monospace";
+ ctx.fillText(score,28,134);
+ ctx.fillText(best,171,134);
+ drawMedal(52,176);
+ ctx.font="10px 'Press Start 2P', monospace";
+ for(let i=0;i<5;i++){
+  const row=leaders[i],y=135+i*31;
+  ctx.textAlign="left";
+  ctx.fillText((i+1)+". "+(row?row.name:"---"),371,y,148);
+  ctx.textAlign="right";
+  ctx.fillText(row?row.score:"-",570,y);
+ }
+ if(shareOpen){
+  for(const r of shareRects()){
+   ctx.fillStyle="#fff";
+   rrect(r.x,r.y,r.w,r.h,7);
+   ctx.fillStyle="#362352";
+   ctx.font="9px 'Press Start 2P', monospace";
+   ctx.textAlign="center";
+   ctx.fillText(r.label,r.x+r.w/2,r.y+18);
+  }
+ }
+ drawGameOverButton(deadPlayRect(),"PLAY","#ff4fc3","#b01382","#3b0629");
+ drawGameOverButton(deadShareRect(),"SHARE","#8b5cff","#4b1fb8","#17083d");
+ ctx.restore();
+}
+function drawDeadPanel(){if(isDesktop())drawDesktopResults();else withUI(drawDeadPanelUI);}
 function renderGame(){
  updateNameInput();ctx.clearRect(0,0,W,H);
  const view=state==="paused"?pausedFrom:state;
