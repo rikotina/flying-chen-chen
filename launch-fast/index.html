@@ -383,6 +383,7 @@ function drawDesktopResults(){
  ctx.font="10px 'Press Start 2P', monospace";
  for(let i=0;i<5;i++){
   const row=leaders[i],y=135+i*31;
+  ctx.fillStyle=row?row.name===playerName?"#ffe184":"#fff":"#a99abf";
   ctx.textAlign="left";
   ctx.fillText((i+1)+". "+(row?row.name:"---"),371,y,148);
   ctx.textAlign="right";
