@@ -148,7 +148,7 @@ let tapCursorCanvas=null,birdOutline=null;
 const bgImgs=BG_SRC.map(src=>{const img=new Image();img.src=src;return img;});
 let state="title",world=pickWorld(),nextWorld=world,frame=0,deadFrame=0,bgX=0,groundX=0,shareOpen=false,appReady=false;
 let score=0,best=Number(localStorage.getItem("flyingChenChenBest")||0);
-let chen,clouds=[],drops=[],rainAnnounced=false,lastGapY=null,stormCount=0;
+let chen,clouds=[],drops=[],rainAnnounced=false,lastGapY=null,stormCount=0,cloudsUntilCeiling=1;
 let playerName=localStorage.getItem("flyingChenChenName")||"",leaders=loadLeaders();
 if(localStorage.getItem("flyingChenChenNameVersion")!=="5"){playerName="";localStorage.removeItem("flyingChenChenName");localStorage.removeItem("flyingChenChenNameLocked");}
 if(playerName==="Player"){playerName="";localStorage.removeItem("flyingChenChenName");localStorage.removeItem("flyingChenChenNameLocked");}
@@ -171,9 +171,9 @@ let pendingScore;
 function saveLeader(){const name=cleanName(playerName);if(!name)return;const prev=leaders.find(r=>r.name===name);if(prev)prev.score=Math.max(prev.score,score);else leaders.push({name,score});leaders.sort((a,b)=>b.score-a.score);leaders=leaders.slice(0,5);localStorage.setItem("flyingChenChenLeaders",JSON.stringify(leaders));pendingScore=submitGlobalScore();}
 function resetChen(){chen={x:W*(innerWidth<=768?.24:.28),y:H/2-56,vy:0,angle:0,flapAnim:0};}
 resetChen();resize();
-function beginTitle(newWorld=true){stopMusic();fetchGlobalLeaders();state="title";frame=0;deadFrame=0;score=0;clouds=[];drops=[];rainAnnounced=false;lastGapY=null;stormCount=0;shareOpen=false;resetChen();if(newWorld){nextWorld=selectedWorld==="random"?pickWorld(world):Number(selectedWorld);world=nextWorld;}}
-function beginReady(){if(!ensurePlayerName())return;startMusic();world=nextWorld;state="ready";frame=0;score=0;clouds=[];drops=[];rainAnnounced=false;lastGapY=null;stormCount=0;resetChen();chen.y=H/2-50;}
-function beginPlay(){state="play";frame=0;clouds=[];drops=[];lastGapY=null;stormCount=0;spawnCloud(chen.x+Math.min(300,W*.75));flap();}
+function beginTitle(newWorld=true){stopMusic();fetchGlobalLeaders();state="title";frame=0;deadFrame=0;score=0;clouds=[];drops=[];rainAnnounced=false;lastGapY=null;stormCount=0;cloudsUntilCeiling=1;shareOpen=false;resetChen();if(newWorld){nextWorld=selectedWorld==="random"?pickWorld(world):Number(selectedWorld);world=nextWorld;}}
+function beginReady(){if(!ensurePlayerName())return;startMusic();world=nextWorld;state="ready";frame=0;score=0;clouds=[];drops=[];rainAnnounced=false;lastGapY=null;stormCount=0;cloudsUntilCeiling=1;resetChen();chen.y=H/2-50;}
+function beginPlay(){state="play";frame=0;clouds=[];drops=[];lastGapY=null;stormCount=0;cloudsUntilCeiling=1;spawnCloud(chen.x+Math.min(300,W*.75));flap();}
 function gameOver(){stopMusic();state="dead";deadFrame=0;shareOpen=false;best=Math.max(best,score);localStorage.setItem("flyingChenChenBest",String(best));saveLeader();}
 function flap(){chen.vy=-FLAP_SPEED;chen.flapAnim=14;}
 function playTone(freq,t,dur,vol=.035,type="square"){if(!soundEnabled||!audioCtx||!freq)return;const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+.015);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(audioCtx.destination);o.start(t);o.stop(t+dur+.03);}
@@ -270,6 +270,13 @@ function spawnCloud(x){
   pieces.push({dx:anchor.dx+Math.round(rnd(22,64)),y:anchor===top?anchor.y-20:anchor.y+22,w:Math.round(rnd(27,48)),h:20});
  }
  if(formation<.58)anchor.y+=anchor===top?Math.round(rnd(18,40)):-Math.round(rnd(18,40));
+ // Reach the highest flyable lane, with room to pass below.
+ if(--cloudsUntilCeiling===0){
+  const dx=Math.round(rnd(-34,12));
+  pieces.push({dx,y:8,w:Math.round(rnd(72,100)),h:Math.round(rnd(45,62))});
+  pieces.push({dx:dx+36,y:49,w:Math.round(rnd(38,60)),h:28});
+  cloudsUntilCeiling=Math.random()<.55?2:3;
+ }
  const hazards=[];
  if(storm&&stormCount++%5===0){
   const fromTop=anchor===top;
