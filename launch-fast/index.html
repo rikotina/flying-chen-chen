@@ -122,7 +122,7 @@ function withUI(draw){const width=W;ctx.save();ctx.translate(uiX,uiY);ctx.scale(
 addEventListener("resize",resize,{passive:true});
 const birdImg=new Image();birdImg.src=BIRD_SRC;
 const tapImg=new Image();tapImg.src=TAP_SRC;
-let tapCursorCanvas=null;
+let tapCursorCanvas=null,birdOutline=null;
 const bgImgs=BG_SRC.map(src=>{const img=new Image();img.src=src;return img;});
 let state="title",world=pickWorld(),nextWorld=world,frame=0,deadFrame=0,bgX=0,groundX=0,shareOpen=false,appReady=false;
 let score=0,best=Number(localStorage.getItem("flyingChenChenBest")||0);
@@ -234,22 +234,28 @@ function spawnCloud(x){
  lastGapY=center;
  const top={dx:Math.round(rnd(-34,16)),y:Math.round(center-gap/2-32),w:Math.round(rnd(46,72)),h:32};
  const bottom={dx:Math.round(rnd(-10,48)),y:Math.round(center+gap/2),w:Math.round(rnd(47,75)),h:32};
- const pieces=[top,bottom];
+ // Mix single clouds, one-sided clusters, and staggered pairs.
+ const formation=Math.random();
  const anchor=Math.random()<.5?top:bottom;
- pieces.push({dx:anchor.dx+Math.round(rnd(16,56)),y:anchor===top?top.y-18:bottom.y+22,w:Math.round(rnd(26,42)),h:20});
- if(storm){
-  const other=anchor===top?bottom:top;
-  pieces.push({dx:other.dx-24,y:other===top?top.y-22:bottom.y+18,w:32,h:22});
+ const other=anchor===top?bottom:top;
+ const pieces=[anchor];
+ if(formation>=.58){
+  other.dx=anchor.dx+Math.round(rnd(48,90));
+  pieces.push(other);
  }
+ if(formation>=.22){
+  pieces.push({dx:anchor.dx+Math.round(rnd(22,64)),y:anchor===top?anchor.y-20:anchor.y+22,w:Math.round(rnd(27,48)),h:20});
+ }
+ if(formation<.58)anchor.y+=anchor===top?Math.round(rnd(18,40)):-Math.round(rnd(18,40));
  const hazards=[];
  if(storm&&stormCount++%5===0){
-  const fromTop=Math.random()<.5;
+  const fromTop=anchor===top;
   hazards.push({dx:fromTop?top.dx+top.w*.75:bottom.dx+bottom.w*.3,
    y:fromTop?top.y+top.h+34:bottom.y-34,w:28,h:54});
  }
  const rightEdge=Math.max(...pieces.map(p=>p.dx+p.w),...hazards.map(h=>h.dx+h.w/2));
  clouds.push({x,w:rightEdge,pieces,hazards,passed:false,
-  spacing:Math.round(storm?rnd(192,324):rnd(215,365))});
+  spacing:Math.round(Math.max(rightEdge+65,Math.random()<.62?rnd(145,240):rnd(295,435)))});
 }
 function spawnStaticDrop(){drops.push({x:W+40,y:Math.round(rnd(92,GROUND_Y-92)),w:14,h:30});}
 function cloudPuff(cx,cy,w,h){ctx.fillRect(cx-w/2,cy-h/2,w,h);ctx.fillRect(cx-w/2+5,cy-h/2-8,w-10,8);ctx.fillRect(cx-w/2+10,cy-h/2-14,w-20,7);}
@@ -258,7 +264,30 @@ function drawClouds(){for(const c of clouds){for(const p of c.pieces)drawCloudBl
 function drawDrop(d){ctx.save();ctx.translate(Math.round(d.x),Math.round(d.y));ctx.fillStyle="#1f7fe5";ctx.fillRect(-2,-d.h/2,4,5);ctx.fillRect(-4,-d.h/2+5,8,7);ctx.fillRect(-6,-d.h/2+12,12,9);ctx.fillRect(-d.w/2,-d.h/2+21,d.w,d.h-26);ctx.fillRect(-d.w/2+2,d.h/2-5,d.w-4,5);ctx.fillStyle="#53c8ff";ctx.fillRect(-d.w/2+2,-d.h/2+12,4,12);ctx.fillStyle="#0d4fb8";ctx.fillRect(d.w/2-2,-d.h/2+18,2,d.h-23);ctx.fillRect(-d.w/2+2,d.h/2-3,d.w-4,3);ctx.restore();}
 function drawLightning(x,y,w,h){ctx.save();ctx.translate(Math.round(x),Math.round(y));ctx.fillStyle="#fff45c";ctx.shadowColor="#fff000";ctx.shadowBlur=12;ctx.beginPath();ctx.moveTo(0,-h/2);ctx.lineTo(w*.34,-h*.08);ctx.lineTo(w*.08,-h*.08);ctx.lineTo(w*.38,h/2);ctx.lineTo(-w*.34,h*.02);ctx.lineTo(-w*.04,h*.02);ctx.closePath();ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle="#d07a00";ctx.lineWidth=2;ctx.stroke();ctx.restore();}
 function drawSparkles(){ctx.save();ctx.translate(chen.x,chen.y);ctx.strokeStyle="#fff7a8";ctx.fillStyle="#ffffff";ctx.shadowColor="#fff45c";ctx.shadowBlur=10;for(let i=0;i<7;i++){const a=frame*.08+i*1.7,r=42+Math.sin(frame*.11+i)*8,x=Math.cos(a)*r,y=Math.sin(a*1.2)*r*.72,s=3+Math.sin(frame*.22+i)*2;ctx.beginPath();ctx.moveTo(x,y-s);ctx.lineTo(x+s,y);ctx.lineTo(x,y+s);ctx.lineTo(x-s,y);ctx.closePath();ctx.fill();}ctx.restore();}
-function drawChen(){ctx.save();ctx.translate(chen.x,chen.y);const target=(state==="play"||state==="dead")?clamp(chen.vy*7,-24,24):0;chen.angle+=(target-chen.angle)*.18;ctx.rotate(chen.angle*Math.PI/180);const flapScale=chen.flapAnim>0?1+Math.sin(chen.flapAnim*.55)*.13:1;ctx.scale(1,flapScale);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(birdImg,-CHEN_W/2,-CHEN_H/2,CHEN_W,CHEN_H);ctx.restore();if(score>=15&&(state==="play"||state==="dead"))drawSparkles();if(chen.flapAnim>0)chen.flapAnim--;}
+function makeBirdOutline(){
+ const outline=document.createElement("canvas");
+ outline.width=CHEN_W+10;
+ outline.height=CHEN_H+10;
+ const brush=outline.getContext("2d");
+ // Outline the sprite's alpha mask so transparent corners stay clear.
+ for(const [radius,color] of [[5,"#17142c"],[2.5,"#fff4cf"]]){
+  const layer=document.createElement("canvas");
+  layer.width=outline.width;
+  layer.height=outline.height;
+  const mask=layer.getContext("2d");
+  for(let i=0;i<16;i++){
+   const angle=i*Math.PI/8;
+   mask.drawImage(birdImg,5+Math.cos(angle)*radius,5+Math.sin(angle)*radius,CHEN_W,CHEN_H);
+  }
+  mask.globalCompositeOperation="source-in";
+  mask.fillStyle=color;
+  mask.fillRect(0,0,layer.width,layer.height);
+  brush.drawImage(layer,0,0);
+ }
+ brush.drawImage(birdImg,5,5,CHEN_W,CHEN_H);
+ return outline;
+}
+function drawChen(){ctx.save();ctx.translate(chen.x,chen.y);const target=(state==="play"||state==="dead")?clamp(chen.vy*7,-24,24):0;chen.angle+=(target-chen.angle)*.18;ctx.rotate(chen.angle*Math.PI/180);const flapScale=chen.flapAnim>0?1+Math.sin(chen.flapAnim*.55)*.13:1;ctx.scale(1,flapScale);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";if(birdOutline)ctx.drawImage(birdOutline,-birdOutline.width/2,-birdOutline.height/2);ctx.restore();if(score>=15&&(state==="play"||state==="dead"))drawSparkles();if(chen.flapAnim>0)chen.flapAnim--;}
 function hitbox(){return{x:chen.x-CHEN_W/2+HIT_MARGIN,y:chen.y-CHEN_H/2+HIT_MARGIN,w:CHEN_W-HIT_MARGIN*2,h:CHEN_H-HIT_MARGIN*2};}
 function overlap(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
 function hasCollision(){const hb=hitbox();if(hb.y+hb.h>GROUND_Y)return true;for(const c of clouds){for(const p of c.pieces){if(overlap(hb,{x:c.x+p.dx+4,y:p.y+4,w:p.w-8,h:p.h-8}))return true;}for(const h of c.hazards||[]){if(overlap(hb,{x:c.x+h.dx-h.w*.34,y:h.y-h.h/2,w:h.w*.68,h:h.h}))return true;}}for(const d of drops){if(overlap(hb,{x:d.x-d.w/2+2,y:d.y-d.h/2+3,w:d.w-4,h:d.h-5}))return true;}return false;}
@@ -307,7 +336,7 @@ const STEP_MS=1000/120;let lastTick=0,tickCarry=0;
 function tick(now){if(!lastTick)lastTick=now;tickCarry+=Math.min(80,now-lastTick);lastTick=now;let steps=0;while(tickCarry>=STEP_MS&&steps<8){updateGame();tickCarry-=STEP_MS;steps++;}if(steps>0)renderGame();requestAnimationFrame(tick);}
 ctx.fillStyle="#080817";ctx.fillRect(0,0,W,H);ctx.textAlign="center";ctx.font="11px 'Press Start 2P', monospace";ctx.fillStyle="#ff88ff";ctx.fillText("Loading Chen Chen...",W/2,H/2-8);
 function waitImage(img){return new Promise(r=>{if(img.complete)r();else{img.onload=r;img.onerror=r;}});}
-Promise.all([document.fonts.load('16px "Press Start 2P"'),waitImage(birdImg),waitImage(tapImg),...bgImgs.map(waitImage)]).then(()=>{appReady=true;makeTapCursor();fetchGlobalLeaders();updateNameInput();requestAnimationFrame(tick);});
+Promise.all([document.fonts.load('16px "Press Start 2P"'),waitImage(birdImg),waitImage(tapImg),...bgImgs.map(waitImage)]).then(()=>{appReady=true;if(birdImg.naturalWidth)birdOutline=makeBirdOutline();makeTapCursor();fetchGlobalLeaders();updateNameInput();requestAnimationFrame(tick);});
 </script>
 </body>
 </html>
